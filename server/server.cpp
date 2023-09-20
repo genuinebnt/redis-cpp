@@ -4,10 +4,78 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <vector>
+
+const size_t k_max_size = 4096;
 
 [[noreturn]] void die(std::string_view message) {
   std::cerr << message << ": " << strerror(errno) << std::endl;
   exit(EXIT_FAILURE);
+}
+
+int read_full(int client_socket, char *rbuf, size_t len) {
+  while (len > 0) {
+    const ssize_t len_read = read(client_socket, rbuf, len);
+    if (len_read == -1) {
+      return -1;
+    }
+    len -= len_read;
+    rbuf += len_read;
+  }
+
+  return 0;
+}
+
+int write_full(int client_socket, const char *wbuf, size_t len) {
+  while (len > 0) {
+    const ssize_t len_written = write(client_socket, wbuf, len);
+    if (len_written == -1) {
+      return -1;
+    }
+    len -= len_written;
+    wbuf += len_written;
+  }
+  return 0;
+}
+
+int process_one_request(int client_socket) {
+  std::array<char, 4 + k_max_size + 1> rbuf;
+  int err = read_full(client_socket, rbuf.data(), 4);
+  if (err != 0) {
+    std::cerr << "read error " << std::endl;
+    return -1;
+  }
+
+  uint32_t len = 0;
+  memcpy(&len, rbuf.data(), 4);
+  if (len > k_max_size) {
+    std::cerr << "message too large" << std::endl;
+    return -1;
+  }
+
+  int err = read_full(client_socket, rbuf.data() + 4, len);
+  if (err) {
+    std::cerr << "read error" << std::endl;
+    return -1;
+  }
+
+  rbuf.data()[4 + len] = '\0';
+  std::cout << "Client says: " << rbuf.data() << std::endl;
+
+  const std::string msg = "general kenobi";
+  const size_t msg_len = msg.size();
+
+  std::vector<char> wbuf;
+  wbuf.reserve(4 + msg.size());
+
+  memcpy(wbuf.data(), &msg_len, 4);
+  memcpy(wbuf.data() + 4, msg.data(), msg_len);
+
+  int err = write_full(client_socket, wbuf.data(), wbuf.size());
+  if (err) {
+    std::cerr << "write failed" << std::endl;
+    return -1;
+  }
 }
 
 int main() {
@@ -42,19 +110,9 @@ int main() {
     int client_socket =
         accept(server_socket, (struct sockaddr *)&client_addr, &socklen);
 
-    std::array<char, 12> rbuf;
-
-    if (const ssize_t rc = read(client_socket, rbuf.data(), 12); rc < 0) {
-      std::cerr << "Failed to read from socket" << std::endl;
-    }
-
-    std::cout << rbuf.data() << std::endl;
-
-    if (strncmp(rbuf.data(), "Hello there", 12) == 0) {
-      if (const ssize_t wc = write(client_socket, "general kenobi", 15);
-          wc < 0) {
-        std::cerr << "write error" << std::endl;
-      }
+    err = process_one_request(client_socket);
+    if (err) {
+      break;
     }
 
     close(server_socket);
