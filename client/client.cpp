@@ -5,10 +5,60 @@
 #include <string.h>
 #include <sys/socket.h>
 #include <unistd.h>
+#include <vector>
+
+const size_t k_max_size = 4096;
 
 [[noreturn]] void die(std::string_view message) {
   std::cerr << message << ": " << strerror(errno) << std::endl;
   exit(EXIT_FAILURE);
+}
+
+int write_full(int fd, const char *wbuf, size_t len) {
+  while (len > 0) {
+    auto len_written = write(fd, wbuf, len);
+    if (len_written < 0) {
+      return -1;
+    }
+    len -= len_written;
+    wbuf += len_written;
+  }
+
+  return 0;
+}
+
+int read_full(int fd, char *rbuf, size_t len) {
+  while (len > 0) {
+    rbuf += 4;
+    auto len_read = read(fd, rbuf, len);
+    if (len_read < 0) {
+      return -1;
+    }
+    len -= len_read;
+    rbuf += len_read;
+  }
+  return 0;
+}
+
+int query(int fd, std::string msg) {
+  size_t len = msg.size();
+  std::cout << len << ":" << k_max_size << std::endl;
+  // if (len > k_max_size) {
+  //   std::cerr << "Message too long" << std::endl;
+  //   return -1;
+  // }
+
+  std::vector<char> wbuf;
+  wbuf.reserve(4 + len);
+
+  memcpy(wbuf.data(), &len, 4);
+  memcpy(wbuf.data() + 4, msg.data(), len);
+
+  if (const int err = write_full(fd, wbuf.data(), wbuf.size()); err < 0) {
+    std::cerr << "cannot write to socket" << std::endl;
+  }
+
+  return 0;
 }
 
 int main() {
@@ -28,18 +78,20 @@ int main() {
     die("Cannot connect to port 1234");
   }
 
-  std::array<char, 12> wbuf = {"Hello there"};
-  if (const auto err = send(client_socket, wbuf.data(), wbuf.size(), 0);
-      err < 0) {
-    die("send failed");
+  std::string msg = "Hello, world!";
+  if (const int err = query(client_socket, msg); err < 0) {
+    std::cerr << "Error cannot query given message: " << msg << std::endl;
   }
 
-  std::array<char, 15> resp;
-  if (const auto err = recv(client_socket, resp.data(), resp.size(), 0);
-      err < 0) {
-    die("recv failed");
+  std::vector<char> rbuf;
+  const int len = read_full(client_socket, rbuf.data(), 4);
+  if (len < 0) {
+    std::cerr << "Error cannot read from server" << std::endl;
   }
 
-  std::cout << resp.data() << std::endl;
-  close(client_socket);
+  if (const int err = read_full(client_socket, rbuf.data() + 4, len); err < 0) {
+    std::cerr << "Error cannot read from server" << std::endl;
+  }
+
+  return 0;
 }

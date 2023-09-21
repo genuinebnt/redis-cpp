@@ -53,7 +53,7 @@ int process_one_request(int client_socket) {
     return -1;
   }
 
-  int err = read_full(client_socket, rbuf.data() + 4, len);
+  err = read_full(client_socket, rbuf.data() + 4, len);
   if (err) {
     std::cerr << "read error" << std::endl;
     return -1;
@@ -71,11 +71,13 @@ int process_one_request(int client_socket) {
   memcpy(wbuf.data(), &msg_len, 4);
   memcpy(wbuf.data() + 4, msg.data(), msg_len);
 
-  int err = write_full(client_socket, wbuf.data(), wbuf.size());
+  err = write_full(client_socket, wbuf.data(), wbuf.size());
   if (err) {
     std::cerr << "write failed" << std::endl;
     return -1;
   }
+
+  return 0;
 }
 
 int main() {
