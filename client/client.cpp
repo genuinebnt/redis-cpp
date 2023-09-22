@@ -1,4 +1,5 @@
 #include <array>
+#include <cstring>
 #include <format>
 #include <iostream>
 #include <netinet/in.h>
@@ -29,7 +30,6 @@ int write_full(int fd, const char *wbuf, size_t len) {
 
 int read_full(int fd, char *rbuf, size_t len) {
   while (len > 0) {
-    rbuf += 4;
     auto len_read = read(fd, rbuf, len);
     if (len_read < 0) {
       return -1;
@@ -40,22 +40,22 @@ int read_full(int fd, char *rbuf, size_t len) {
   return 0;
 }
 
-int query(int fd, std::string msg) {
+int query(int fd, std::string_view msg) {
   size_t len = msg.size();
   std::cout << len << ":" << k_max_size << std::endl;
-  // if (len > k_max_size) {
-  //   std::cerr << "Message too long" << std::endl;
-  //   return -1;
-  // }
+  if (len > k_max_size) {
+    std::cerr << "Message too long" << std::endl;
+    return -1;
+  }
 
-  std::vector<char> wbuf;
-  wbuf.reserve(4 + len);
+  std::vector<char> wbuf(4 + len);
 
-  memcpy(wbuf.data(), &len, 4);
-  memcpy(wbuf.data() + 4, msg.data(), len);
+  std::memcpy(wbuf.data(), &len, 4);
+  std::memcpy(wbuf.data() + 4, msg.data(), len);
 
   if (const int err = write_full(fd, wbuf.data(), wbuf.size()); err < 0) {
     std::cerr << "cannot write to socket" << std::endl;
+    return err;
   }
 
   return 0;
@@ -69,7 +69,7 @@ int main() {
 
   struct sockaddr_in addr {};
   addr.sin_family = AF_INET;
-  addr.sin_port = ntohs(1234);
+  addr.sin_port = htons(1234);
   addr.sin_addr.s_addr = ntohl(INADDR_LOOPBACK);
 
   if (const int err =
@@ -81,9 +81,10 @@ int main() {
   std::string msg = "Hello, world!";
   if (const int err = query(client_socket, msg); err < 0) {
     std::cerr << "Error cannot query given message: " << msg << std::endl;
+    return -1;
   }
 
-  std::vector<char> rbuf;
+  std::vector<char> rbuf(4 + k_max_size);
   const int len = read_full(client_socket, rbuf.data(), 4);
   if (len < 0) {
     std::cerr << "Error cannot read from server" << std::endl;
@@ -92,6 +93,8 @@ int main() {
   if (const int err = read_full(client_socket, rbuf.data() + 4, len); err < 0) {
     std::cerr << "Error cannot read from server" << std::endl;
   }
+
+  close(client_socket);
 
   return 0;
 }

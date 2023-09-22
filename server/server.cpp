@@ -1,4 +1,5 @@
 #include <array>
+#include <cstring>
 #include <iostream>
 #include <netinet/in.h>
 #include <string.h>
@@ -39,7 +40,8 @@ int write_full(int client_socket, const char *wbuf, size_t len) {
 }
 
 int process_one_request(int client_socket) {
-  std::array<char, 4 + k_max_size + 1> rbuf;
+  std::vector<char> rbuf(4 + k_max_size + 1);
+
   int err = read_full(client_socket, rbuf.data(), 4);
   if (err != 0) {
     std::cerr << "read error " << std::endl;
@@ -47,32 +49,33 @@ int process_one_request(int client_socket) {
   }
 
   uint32_t len = 0;
-  memcpy(&len, rbuf.data(), 4);
+  std::memcpy(&len, rbuf.data(), 4);
   if (len > k_max_size) {
     std::cerr << "message too large" << std::endl;
     return -1;
   }
 
   err = read_full(client_socket, rbuf.data() + 4, len);
-  if (err) {
+  if (err < 0) {
     std::cerr << "read error" << std::endl;
     return -1;
   }
 
-  rbuf.data()[4 + len] = '\0';
-  std::cout << "Client says: " << rbuf.data() << std::endl;
+  for (const auto &i : rbuf) {
+    std::cout << i;
+  }
+  std::cout << '\n';
 
   const std::string msg = "general kenobi";
   const size_t msg_len = msg.size();
 
-  std::vector<char> wbuf;
-  wbuf.reserve(4 + msg.size());
+  std::vector<char> wbuf(4 + msg.size());
 
-  memcpy(wbuf.data(), &msg_len, 4);
-  memcpy(wbuf.data() + 4, msg.data(), msg_len);
+  std::memcpy(wbuf.data(), &msg_len, 4);
+  std::memcpy(wbuf.data() + 4, msg.data(), msg_len);
 
   err = write_full(client_socket, wbuf.data(), wbuf.size());
-  if (err) {
+  if (err < 0) {
     std::cerr << "write failed" << std::endl;
     return -1;
   }
@@ -112,8 +115,12 @@ int main() {
     int client_socket =
         accept(server_socket, (struct sockaddr *)&client_addr, &socklen);
 
+    if (client_socket < 0) {
+      continue;
+    }
+
     err = process_one_request(client_socket);
-    if (err) {
+    if (err < 0) {
       break;
     }
 
