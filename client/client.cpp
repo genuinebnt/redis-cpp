@@ -78,20 +78,18 @@ int main() {
     die("Cannot connect to port 1234");
   }
 
-  std::string msg = "Hello, world!";
-  if (const int err = query(client_socket, msg); err < 0) {
-    std::cerr << "Error cannot query given message: " << msg << std::endl;
-    return -1;
-  }
+  while (true) {
+    std::cout << "->";
+    std::string msg;
+    std::cin >> msg;
 
-  std::vector<char> rbuf(4 + k_max_size);
-  const int len = read_full(client_socket, rbuf.data(), 4);
-  if (len < 0) {
-    std::cerr << "Error cannot read from server" << std::endl;
-  }
+    if (strcmp(msg.data(), "exit") == 0) {
+      break;
+    }
 
-  if (const int err = read_full(client_socket, rbuf.data() + 4, len); err < 0) {
-    std::cerr << "Error cannot read from server" << std::endl;
+    if (const int err = query(client_socket, msg); err < 0) {
+      std::cerr << "Error cannot query given message: " << msg << std::endl;
+    }
   }
 
   close(client_socket);
