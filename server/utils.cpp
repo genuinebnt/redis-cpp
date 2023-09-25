@@ -1,4 +1,4 @@
-#include "utils.h"
+#include "utils.hpp"
 
 int fd_set_nb(int fd) {
   int errno = 0;
@@ -10,7 +10,7 @@ int fd_set_nb(int fd) {
   flags |= O_NONBLOCK;
 
   errno = 0;
-  fnctl(fd, F_SETFL, flags);
+  (void)fnctl(fd, F_SETFL, flags);
   if (errno) {
     return -1;
   }

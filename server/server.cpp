@@ -1,6 +1,8 @@
-#include "server.h"
+#include "server.hpp"
 #include "connection.hpp"
-#include "utils.h"
+#include "utils.hpp"
+
+#include <poll.h>
 
 int Server::read_full(int client_socket, char *rbuf, size_t len) {
   while (len > 0) {
@@ -75,7 +77,7 @@ void Server::listen_on_server() const {
   }
 }
 
-void Server::start() const {
+int Server::start() const {
   bind_server();
   listen_on_server();
 
@@ -83,8 +85,7 @@ void Server::start() const {
   std::vector<Connection *> fd2conn;
 
   // set socket to non-blocking mode
-  int err = fd_set_nb(_socket);
-  if (err < 0) {
+  if (int err = fd_set_nb(_socket); err < 0) {
     std::cerr << "Failed to set socket to non-blocking mode" << std::endl;
     return;
   }
@@ -95,7 +96,43 @@ void Server::start() const {
     poll_args.clear();
 
     struct pollfd pfd = {_socket, POLLIN, 0};
+    poll_args.push_back(pfd);
+
+    for (Connection const *conn : fd2conn) {
+      if (!conn) {
+        continue;
+      }
+
+      struct pollfd pfd = {};
+      pfd.fd = conn->fd;
+      pfd.events = (conn->state == State::STATE_REQ) ? POLLIN : POLLOUT;
+      pfd.events = pfd.events | POLLERR;
+      poll_args.push_back(pfd);
+    }
+
+    if (int rv = poll(poll_args.data(), poll_args.size(), 1000); rv < 0) {
+      std::cerr << "Error polling" << std::endl;
+      return;
+    }
+
+    for (const auto &args : poll_args) {
+      if (args.revents) {
+        Connection *conn = fd2conn[args.fd];
+        connection_io(conn);
+        if (conn->state == State::STATE_END) {
+          fd2conn[conn->fd] = nullptr;
+          close(conn->fd);
+          free(conn);
+        }
+      }
+    }
+
+    // first argument is the listening fd
+    if (poll_args.front().revents) {
+      accept_new_connection(fd2conn, _socket);
+    }
   }
+  return 0;
 }
 
 int main() {

@@ -1,6 +1,6 @@
 #pragma once
 #include "exceptions.hpp"
-#include "utils.h"
+#include "utils.hpp"
 
 #include <array>
 #include <cstdint>
@@ -11,7 +11,7 @@
 #include <unistd.h>
 #include <vector>
 
-enum class state {
+enum class State {
   STATE_REQ = 0,
   STATE_RES = 1,
   STATE_END = 2,
@@ -36,7 +36,7 @@ public:
 
   void bind_server() const;
   void listen_on_server() const;
-  void start() const;
+  int start() const;
 
   static int read_full(int client_socket, char *rbuf, size_t len);
   static int write_full(int client_socket, const char *wbuf, size_t len);
