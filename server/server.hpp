@@ -38,6 +38,13 @@ public:
   void listen_on_server() const;
   int start() const;
 
+  int32_t accept_new_connections(std::vector<Connection *> &fd2conn, int fd);
+  void conn_put(std::vector<Connection *> &fd2conn, struct Connection *conn);
+  void connection_io(Connection *conn);
+  void state_req(Connection *conn);
+  void state_res(Connection *conn);
+  bool try_fill_buffer(Connection *conn);
+
   static int read_full(int client_socket, char *rbuf, size_t len);
   static int write_full(int client_socket, const char *wbuf, size_t len);
   static int process_one_request(int client_socket);

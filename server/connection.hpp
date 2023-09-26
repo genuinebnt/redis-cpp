@@ -12,4 +12,5 @@ struct Connection {
   std::array<char, 4 + K_MAX_SIZE> rbuf;
   size_t wbuf_size = 0;
   std::array<char, 4 + K_MAX_SIZE> wbuf;
+  size_t wbuf_send = 0;
 };

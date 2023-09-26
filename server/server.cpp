@@ -77,6 +77,61 @@ void Server::listen_on_server() const {
   }
 }
 
+void Server::connection_io(Connection *conn) {
+  if (conn->state == State::STATE_REQ) {
+    state_req(conn);
+  } else if (conn->state == State::STATE_RES) {
+    state_res(conn);
+  } else {
+    assert(0);
+  }
+}
+
+void Server::try_fill_buffer(Connection *conn) {
+  assert(conn->r_buf_size < sizeof(conn->rbuf));
+}
+
+void Server::state_req(Connection *conn) {
+  while (try_fill_buffer(conn)) {
+  }
+}
+
+void conn_put(std::vector<Connection *> &fd2conn, struct Connection *conn) {
+  if (fd2conn.size() <= (size_t)conn->fd) {
+    fd2conn.resize(conn->fd + 1);
+  }
+
+  fd2conn[conn->fd] = conn;
+}
+
+int32_t Server::accept_new_connections(std::vector<Connection *> &fd2conn,
+                                       int fd) {
+  struct sockaddr_in addr = {};
+  socklen_t addrlen = sizeof(addr);
+  int connfd = accept(fd, (struct sockaddr *)&addr, &addrlen);
+  if (connfd < 0) {
+    std::cerr << "Accept error: " << strerror(errno) << std::endl;
+    return -1;
+  }
+
+  fd_set_nb(fd);
+
+  struct Connection *conn =
+      (struct Connection *)malloc(sizeof(struct Connection));
+  if (!conn) {
+    close(connfd);
+    return -1;
+  }
+
+  conn->fd = connfd;
+  conn->state = State::STATE_REQ;
+  conn->r_buf_size = 0;
+  conn->wbuf_size = 0;
+  conn->wbuf_send = 0;
+  conn_put(fd2conn, conn);
+  return 0;
+}
+
 int Server::start() const {
   bind_server();
   listen_on_server();
@@ -87,7 +142,7 @@ int Server::start() const {
   // set socket to non-blocking mode
   if (int err = fd_set_nb(_socket); err < 0) {
     std::cerr << "Failed to set socket to non-blocking mode" << std::endl;
-    return;
+    return -1;
   }
 
   // event loop
@@ -112,7 +167,7 @@ int Server::start() const {
 
     if (int rv = poll(poll_args.data(), poll_args.size(), 1000); rv < 0) {
       std::cerr << "Error polling" << std::endl;
-      return;
+      return -1;
     }
 
     for (const auto &args : poll_args) {
