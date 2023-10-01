@@ -1,3 +1,3 @@
 project(server)
-add_executable(server server.cpp)
-target_include_directories(server PRIVATE ${PROJECT_SOUCE_DIR})
+add_executable(server server.cpp session.cpp)
+target_link_libraries(server Boost::log Boost::boost)
