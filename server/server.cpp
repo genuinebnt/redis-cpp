@@ -1,8 +1,6 @@
 #include "server.hpp"
 #include "session.hpp"
 
-#include <boost/log/trivial.hpp>
-
 int main() {
   try {
     boost::asio::io_context ioc{};
@@ -19,7 +17,6 @@ void server::do_accept() {
   acceptor_.async_accept(
       [this](boost::system::error_code ec, tcp::socket socket) {
         if (!ec) {
-          BOOST_LOG_TRIVIAL(info) << "Starting server";
           std::make_shared<session>(std::move(socket))->start();
         }
         do_accept();

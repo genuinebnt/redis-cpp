@@ -1,10 +1,6 @@
 cmake_minimum_required(VERSION 3.5)
 project(redis_clone)
 
-if(EXISTS ${CMAKE_CURRENT_BINARY_DIR}/conaninfo.txt)
-    list(PREPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_BINARY_DIR}")
-endif()
-
 find_package(Boost REQUIRED COMPONENTS log)
 if(Boost_FOUND)
   include_directories(${Boost_INCLUDE_DIRS} log)
